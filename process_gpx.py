@@ -7,7 +7,7 @@ from geopy.distance import geodesic
 # --- CONFIGURAZIONE ---
 USER = "albeb985-Dev"
 REPO = "prjdrivingroads"
-BASE_DIR = "Gpx"  # La cartella principale che contiene le sottocartelle
+BASE_DIR = "gpx"  # La cartella principale che contiene le sottocartelle
 OUTPUT_DIR = "output_data" # Dove verranno salvati i grafici
 
 if not os.path.exists(OUTPUT_DIR):
