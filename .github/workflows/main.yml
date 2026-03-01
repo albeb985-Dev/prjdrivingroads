@@ -1,6 +1,9 @@
 name: Elabora GPX
 on: [push] # Si attiva quando carichi un file
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
