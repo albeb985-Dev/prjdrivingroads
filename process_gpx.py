@@ -2,50 +2,90 @@ import gpxpy
 import matplotlib.pyplot as plt
 import reverse_geocoder as rg
 import os
+from geopy.distance import geodesic
 
-def run_analysis():
-    # Cerca il primo file .gpx nella cartella
-    gpx_files = [f for f in os.listdir('.') if f.endswith('.gpx')]
-    if not gpx_files: return
-    
-    file_path = gpx_files[0]
+# --- CONFIGURAZIONE ---
+USER = "albeb985-Dev"
+REPO = "prjdrivingroads"
+BASE_DIR = "Gpx"  # La cartella principale che contiene le sottocartelle
+OUTPUT_DIR = "output_data" # Dove verranno salvati i grafici
+
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+
+def process_file(file_path):
     with open(file_path, 'r') as f:
-        gpx = gpxpy.parse(f)
+        try:
+            gpx = gpxpy.parse(f)
+        except:
+            return None # Salta file corrotti
 
     altitudes = []
-    lats_lons = []
-    
+    points = []
+    total_dist = 0
+    prev_p = None
+
     for track in gpx.tracks:
         for segment in track.segments:
             for p in segment.points:
                 altitudes.append(p.elevation)
-                lats_lons.append((p.latitude, p.longitude))
+                points.append((p.latitude, p.longitude))
+                if prev_p:
+                    total_dist += geodesic((prev_p.latitude, prev_p.longitude), (p.latitude, p.longitude)).kilometers
+                prev_p = p
 
-    # Calcoli
-    max_alt = max(altitudes)
-    min_alt = min(altitudes)
+    if not altitudes: return None
+
+    # Analisi Geografica (Stato/Regione)
+    # Usiamo il primo punto del tracciato per la località
+    res = rg.search([points[0]])[0]
     
-    # Geolocalizzazione (Stato e Regione)
-    res = rg.search([lats_lons[0], lats_lons[len(lats_lons)//2]])
-    regione = res[0]['admin1']
-    stato = res[0]['cc']
-
-    # Creazione Grafico
+    # Generazione Grafico
     plt.figure(figsize=(8, 4))
-    plt.plot(altitudes, color='blue')
-    plt.fill_between(range(len(altitudes)), altitudes, color='skyblue', alpha=0.3)
-    graph_name = "grafico_altitudine.png"
-    plt.savefig(graph_name)
+    plt.fill_between(range(len(altitudes)), altitudes, color='skyblue', alpha=0.4)
+    plt.plot(altitudes, color='royalblue', lw=2)
+    plt.title(f"Profilo: {os.path.basename(file_path)}")
+    
+    # Nome file univoco per il grafico (sostituiamo / con _)
+    graph_filename = file_path.replace(os.sep, "_").replace(".gpx", ".png")
+    graph_path = os.path.join(OUTPUT_DIR, graph_filename)
+    plt.savefig(graph_path)
+    plt.close()
 
-    # Composizione URL (Esempio GitHub Pages)
-    user = "albeb985-Dev"
-    repo = "prjdrivingroads"
-    gpx_url = f"https://github.com/{user}/{repo}/blob/main/{file_path}"
-    img_url = f"https://raw.githubusercontent.com/{user}/{repo}/main/{graph_name}"
+    # Composizione URL (Definita)
+    gpx_url = f"https://github.com/{USER}/{REPO}/blob/main/{file_path}"
+    img_url = f"https://raw.githubusercontent.com/{USER}/{REPO}/main/{graph_path}"
 
-    # Salva report finale
-    with open("report.txt", "w") as r:
-        r.write(f"Max: {max_alt}m\nMin: {min_alt}m\nStato: {stato}\nRegione: {regione}\nGPX: {gpx_url}\nIMG: {img_url}")
+    return {
+        "file": file_path,
+        "max_alt": max(altitudes),
+        "min_alt": min(altitudes),
+        "dist": round(total_dist, 2),
+        "stato": res['cc'],
+        "regione": res['admin1'],
+        "gpx_url": gpx_url,
+        "img_url": img_url
+    }
 
-if __name__ == "__main__":
-    run_analysis()
+# --- ESECUZIONE RICORSIVA ---
+all_results = []
+for root, dirs, files in os.walk(BASE_DIR):
+    for file in files:
+        if file.lower().endswith(".gpx"):
+            full_path = os.path.join(root, file)
+            print(f"Elaborazione: {full_path}...")
+            data = process_file(full_path)
+            if data:
+                all_results.append(data)
+
+# Salvataggio Report Finale in Markdown (scansionabile da GitHub)
+with open("REPORT_FINALE.md", "w") as f:
+    f.write("# Report Automazione GPX\n\n")
+    for r in all_results:
+        f.write(f"## File: {r['file']}\n")
+        f.write(f"- **Distanza:** {r['dist']} km\n")
+        f.write(f"- **Altitudine:** Max {r['max_alt']}m / Min {r['min_alt']}m\n")
+        f.write(f"- **Località:** {r['regione']}, {r['stato']}\n")
+        f.write(f"- [Scarica GPX]({r['gpx_url']})\n\n")
+        f.write(f"![Grafico]({r['img_url']})\n")
+        f.write("---\n")
