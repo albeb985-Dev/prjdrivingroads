@@ -1,0 +1,23 @@
+name: Elabora GPX
+on: [push] # Si attiva quando carichi un file
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install gpxpy matplotlib geopy reverse_geocoder
+      - name: Run Script
+        run: python process_gpx.py
+      - name: Commit changes # Carica il grafico generato nel repository
+        run: |
+          git config --global user.name 'GPX Bot'
+          git config --global user.email 'bot@github.com'
+          git add .
+          git commit -m "Aggiornato grafico e dati"
+          git push
